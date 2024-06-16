@@ -1,5 +1,6 @@
+# frozen_string_literal: true
+
 module RescueFrom
-  # This method is called when the module is included in another class
   def self.included(base)
     # Extend the base class with the ClassMethods module
     base.extend(ClassMethods)
@@ -14,7 +15,7 @@ module RescueFrom
 
     # This hook is called whenever a method is added to the class
     def method_added(method_name)
-      # Prevent recursion
+      # Prevent recursion cause define method triggers method_added again
       return if @adding_method
 
       @adding_method = true
@@ -24,17 +25,13 @@ module RescueFrom
 
       # Redefine the method to wrap it in a begin-rescue block
       define_method(method_name) do |*args, &block|
-        begin
-          #bind Unbounded method to self to make it Method
-          original_method.bind(self).call(*args, &block)
-        rescue => e
-          handler = self.class.instance_variable_get(:@exception_handlers)[e.class]
-          if handler
-            send(handler, e)
-          else
-            raise e
-          end
-        end
+        # bind Unbounded method to self to make it Method
+        original_method.bind(self).call(*args, &block)
+      rescue StandardError => e
+        handler = self.class.instance_variable_get(:@exception_handlers)[e.class]
+        raise e unless handler
+
+        send(handler, e)
       end
 
       @adding_method = false
